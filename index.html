@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>A walk on Jackl</title>
+  <meta property="og:title" content="A walk on Jackl" />
+  <meta property="og:description" content="See this dog walk — the route, distance and time. Do the same walk." />
+  <meta property="og:type" content="website" />
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --scarlet: #FF3E00; --forest: #0C3B2C; --ivory: #FBF7EF;
+      --ink: #1C1B19; --soft: #8A857C; --cream: #EFE9DD;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--ivory); color: var(--ink); -webkit-font-smoothing: antialiased; }
+    .wrap { max-width: 560px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+    header { padding: 20px 22px 12px; display: flex; align-items: center; gap: 10px; }
+    .brand { font-weight: 900; font-size: 22px; letter-spacing: 0.5px; color: var(--forest); }
+    .brand span { color: var(--scarlet); }
+    .paw { font-size: 20px; }
+    #map { flex: 1; min-height: 320px; margin: 8px 18px 0; border-radius: 20px; overflow: hidden; background: var(--cream); box-shadow: 0 3px 14px rgba(0,0,0,0.1); }
+    .title { padding: 16px 22px 2px; font-size: 24px; font-weight: 800; }
+    .when { padding: 0 22px; color: var(--soft); font-size: 14px; font-weight: 600; }
+    .stats { display: flex; margin: 16px 18px 0; background: #fff; border-radius: 20px; padding: 18px 0; box-shadow: 0 3px 12px rgba(0,0,0,0.08); }
+    .stat { flex: 1; text-align: center; }
+    .stat .n { font-size: 28px; font-weight: 800; }
+    .stat .l { font-size: 11px; letter-spacing: 1px; color: var(--soft); font-weight: 800; margin-top: 3px; }
+    .divider { width: 1px; background: var(--cream); }
+    .cta { margin: 18px; padding: 16px; background: var(--scarlet); color: #fff; border: none; border-radius: 14px; font-size: 17px; font-weight: 800; text-align: center; text-decoration: none; display: block; }
+    .note { text-align: center; color: var(--soft); font-size: 12px; padding: 0 22px 26px; line-height: 1.5; }
+    .loading, .error { padding: 60px 30px; text-align: center; color: var(--soft); }
+    .error strong { color: var(--ink); display: block; margin-bottom: 6px; font-size: 17px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="paw">🐾</span>
+      <span class="brand">Jack<span>l</span></span>
+    </header>
+    <div id="content"><div class="loading">Loading walk…</div></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    var SUPABASE_URL = 'https://gywviuocvfbqorgpbyhv.supabase.co';
+    // Publishable (public) key — the same one shipped inside the Jackl app. Not a secret.
+    var SUPABASE_KEY = 'sb_publishable_S2-0qp5bxWIBRTDm_9oOFA_ZMvP0yTc';
+
+    function fmtDuration(s) {
+      s = Math.max(0, Math.floor(s));
+      var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = ('0' + (s % 60)).slice(-2);
+      return h > 0 ? (h + ':' + ('0' + m).slice(-2) + ':' + sec) : (m + ':' + sec);
+    }
+    function fmtWhen(iso) {
+      try {
+        var d = new Date(iso);
+        return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+      } catch (e) { return ''; }
+    }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+
+    function showError(msg) {
+      document.getElementById('content').innerHTML =
+        '<div class="error"><strong>' + esc(msg) + '</strong>This link may have been turned off, or it isn\'t valid.</div>';
+    }
+
+    function render(w) {
+      var path = w.shared_path || [];
+      var km = (w.distance_m / 1000).toFixed(2);
+      var name = w.dog_name ? (esc(w.dog_name) + '’s Walk') : 'A Walk';
+      document.getElementById('content').innerHTML =
+        '<div id="map"></div>' +
+        '<div class="title">' + name + '</div>' +
+        '<div class="when">' + esc(fmtWhen(w.started_at)) + '</div>' +
+        '<div class="stats">' +
+          '<div class="stat"><div class="n">' + km + '</div><div class="l">KM</div></div>' +
+          '<div class="divider"></div>' +
+          '<div class="stat"><div class="n">' + fmtDuration(w.duration_s) + '</div><div class="l">TIME</div></div>' +
+        '</div>' +
+        '<a class="cta" href="https://apps.apple.com/app/jackl">Walk this route — get Jackl</a>' +
+        '<div class="note">The start and end are trimmed for the walker’s privacy.</div>';
+
+      var pts = path.map(function (p) { return [p.lat, p.lng]; });
+      var map = L.map('map', { zoomControl: false, attributionControl: true });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '© OpenStreetMap'
+      }).addTo(map);
+      if (pts.length >= 2) {
+        var line = L.polyline(pts, { color: '#FF3E00', weight: 5 }).addTo(map);
+        L.circleMarker(pts[0], { radius: 7, color: '#fff', weight: 3, fillColor: '#0C3B2C', fillOpacity: 1 }).addTo(map);
+        L.circleMarker(pts[pts.length - 1], { radius: 7, color: '#fff', weight: 3, fillColor: '#FF3E00', fillOpacity: 1 }).addTo(map);
+        map.fitBounds(line.getBounds(), { padding: [40, 40] });
+      } else if (pts.length === 1) {
+        map.setView(pts[0], 15);
+      } else {
+        map.setView([-33.9, 151.18], 13);
+      }
+    }
+
+    (function () {
+      var m = (location.hash || '').match(/t=([0-9a-fA-F-]+)/);
+      var token = m && m[1];
+      if (!token) { showError('No walk in this link'); return; }
+      fetch(SUPABASE_URL + '/rest/v1/rpc/get_shared_walk', {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_token: token })
+      })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function (rows) {
+          var w = Array.isArray(rows) ? rows[0] : rows;
+          if (!w) { showError('Walk not found'); return; }
+          render(w);
+        })
+        .catch(function () { showError('Couldn’t load this walk'); });
+    })();
+  </script>
+</body>
+</html>
