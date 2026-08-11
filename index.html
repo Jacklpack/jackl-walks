@@ -68,7 +68,11 @@
     function render(w) {
       var path = w.shared_path || [];
       var km = (w.distance_m / 1000).toFixed(2);
-      var name = w.dog_name ? (esc(w.dog_name) + '’s Walk') : 'A Walk';
+      // Shared walks are titled by the ACCOUNT (household) name, e.g. "Rothko & Ultra's Walk" - the
+      // external viewer doesn't need to know which individual dog. Falls back to the dog name (and the
+      // old dog_name field, so this works before/after the get_shared_walk update).
+      var who = w.walker_name || w.dog_name;
+      var name = who ? (esc(who) + '’s Walk') : 'A Walk';
       document.getElementById('content').innerHTML =
         '<div id="map"></div>' +
         '<div class="title">' + name + '</div>' +
