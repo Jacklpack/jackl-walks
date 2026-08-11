@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Reset your Jackl password</title>
+  <style>
+    :root { --scarlet:#FF3E00; --forest:#0C3B2C; --ivory:#FDFCF7; --ink:#1A1A18; --soft:#5C5A52; --cream:#EDE7D1; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--ivory); color:var(--ink); -webkit-font-smoothing:antialiased; }
+    .wrap { max-width:440px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding:28px 24px; }
+    .brand { font-weight:900; font-size:30px; letter-spacing:0.5px; color:var(--ink); margin-bottom:26px; }
+    .brand span { color:var(--scarlet); }
+    h1 { font-size:22px; font-weight:800; margin-bottom:8px; }
+    p.sub { color:var(--soft); font-size:14.5px; line-height:1.5; margin-bottom:22px; }
+    label { display:block; font-size:12px; font-weight:800; letter-spacing:0.6px; color:var(--soft); margin:0 0 7px 2px; text-transform:uppercase; }
+    input { width:100%; background:#fff; border:1.5px solid var(--cream); border-radius:14px; padding:15px 16px; font-size:16px; color:var(--ink); margin-bottom:16px; }
+    input:focus { outline:none; border-color:var(--scarlet); }
+    button { width:100%; background:var(--scarlet); color:#fff; border:none; border-radius:14px; padding:16px; font-size:16px; font-weight:800; cursor:pointer; }
+    button:disabled { opacity:0.6; }
+    .msg { margin-top:16px; font-size:14px; line-height:1.5; }
+    .msg.err { color:#B3261E; }
+    .msg.ok { color:var(--forest); font-weight:700; }
+    .done { text-align:center; }
+    .done .tick { font-size:44px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">Jack<span>l</span></div>
+    <div id="content">
+      <h1>Set a new password</h1>
+      <p class="sub">Choose a new password for your Jackl account, then head back to the app and log in.</p>
+      <label for="pw">New password</label>
+      <input id="pw" type="password" autocomplete="new-password" placeholder="At least 6 characters" />
+      <label for="pw2">Confirm new password</label>
+      <input id="pw2" type="password" autocomplete="new-password" placeholder="Re-enter it" />
+      <button id="go">Set new password</button>
+      <div id="msg" class="msg"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+    // Publishable (public) key - the same one shipped inside the Jackl app. Not a secret.
+    const SUPABASE_URL = 'https://gywviuocvfbqorgpbyhv.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_S2-0qp5bxWIBRTDm_9oOFA_ZMvP0yTc';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { detectSessionInUrl: true, flowType: 'implicit', persistSession: false },
+    });
+
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('go');
+    let recovered = false;
+    // The recovery link puts the session in the URL; supabase-js reads it and fires PASSWORD_RECOVERY.
+    supabase.auth.onAuthStateChange((event, session) => { if (event === 'PASSWORD_RECOVERY' || session) recovered = true; });
+
+    btn.addEventListener('click', async () => {
+      const pw = document.getElementById('pw').value;
+      const pw2 = document.getElementById('pw2').value;
+      msg.className = 'msg';
+      if (pw.length < 6) { msg.textContent = 'Password must be at least 6 characters.'; msg.className = 'msg err'; return; }
+      if (pw !== pw2) { msg.textContent = 'Those passwords don’t match.'; msg.className = 'msg err'; return; }
+      btn.disabled = true; msg.textContent = '';
+      const { error } = await supabase.auth.updateUser({ password: pw });
+      btn.disabled = false;
+      if (error) {
+        msg.className = 'msg err';
+        msg.textContent = recovered
+          ? error.message
+          : 'This reset link is invalid or has expired. Request a new one from the app.';
+        return;
+      }
+      document.getElementById('content').innerHTML =
+        '<div class="done"><div class="tick">✓</div><h1>Password updated</h1>' +
+        '<p class="sub">Open the Jackl app and log in with your new password.</p></div>';
+    });
+  </script>
+</body>
+</html>
