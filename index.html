@@ -15,13 +15,14 @@
       --ink: #1C1B19; --soft: #8A857C; --cream: #EFE9DD;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--ivory); color: var(--ink); -webkit-font-smoothing: antialiased; }
+    /* White page so a printed copy uses almost no ink; the dogs sit in a small cream bar instead. */
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; color: var(--ink); -webkit-font-smoothing: antialiased; }
     .wrap { max-width: 520px; margin: 0 auto; padding-bottom: 10px; }
     header { padding: 18px 22px 2px; }
     .brand-logo { height: 26px; width: auto; display: block; }
     /* Intro: who shared it, and a warm line. */
     .intro { padding: 10px 22px 0; }
-    .dogs { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 15px; }
+    .dogs { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; margin-bottom: 15px; background: var(--cream); border-radius: 18px; padding: 15px 18px; }
     .dog { display: flex; align-items: center; gap: 11px; }
     .dface { width: 92px; height: 92px; border-radius: 50%; object-fit: cover; background: var(--cream); border: 3px solid #fff; box-shadow: 0 3px 10px rgba(0,0,0,0.16); display: inline-block; }
     .dname { font-weight: 800; font-size: 18px; }
