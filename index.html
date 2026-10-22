@@ -16,19 +16,26 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--ivory); color: var(--ink); -webkit-font-smoothing: antialiased; }
-    .wrap { max-width: 560px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
-    header { padding: 20px 22px 12px; display: flex; align-items: center; justify-content: flex-start; }
-    .brand-logo { height: 28px; width: auto; display: block; }
-    #map { flex: 1; min-height: 320px; margin: 8px 18px 0; border-radius: 20px; overflow: hidden; background: var(--cream); box-shadow: 0 3px 14px rgba(0,0,0,0.1); }
-    .title { padding: 16px 22px 2px; font-size: 24px; font-weight: 800; }
-    .when { padding: 0 22px; color: var(--soft); font-size: 14px; font-weight: 600; }
-    .stats { display: flex; margin: 16px 18px 0; background: #fff; border-radius: 20px; padding: 18px 0; box-shadow: 0 3px 12px rgba(0,0,0,0.08); }
-    .stat { flex: 1; text-align: center; }
-    .stat .n { font-size: 28px; font-weight: 800; }
-    .stat .l { font-size: 11px; letter-spacing: 1px; color: var(--soft); font-weight: 800; margin-top: 3px; }
-    .divider { width: 1px; background: var(--cream); }
-    .cta { margin: 18px; padding: 16px; background: var(--scarlet); color: #fff; border: none; border-radius: 14px; font-size: 17px; font-weight: 800; text-align: center; text-decoration: none; display: block; }
-    .note { text-align: center; color: var(--soft); font-size: 12px; padding: 0 22px 26px; line-height: 1.5; }
+    .wrap { max-width: 520px; margin: 0 auto; padding-bottom: 10px; }
+    header { padding: 18px 22px 2px; }
+    .brand-logo { height: 26px; width: auto; display: block; }
+    /* Intro: who shared it, and a warm line. */
+    .intro { padding: 10px 22px 0; }
+    .dogs { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 13px; }
+    .dog { display: flex; align-items: center; gap: 9px; }
+    .dface { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; background: var(--cream); border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.14); display: inline-block; }
+    .dname { font-weight: 800; font-size: 16px; }
+    .msg { font-size: 18px; font-weight: 700; line-height: 1.38; }
+    #map { height: 300px; margin: 15px 18px 0; border-radius: 20px; overflow: hidden; background: var(--cream); box-shadow: 0 3px 14px rgba(0,0,0,0.1); }
+    /* Under the map: the place, the stats, then the start address in small text. */
+    .below { padding: 18px 22px 0; }
+    .place { font-size: 28px; font-weight: 800; letter-spacing: -0.3px; line-height: 1.12; }
+    .stats-row { display: flex; gap: 32px; margin-top: 12px; }
+    .stat2 .n { font-size: 23px; font-weight: 800; }
+    .stat2 .l { font-size: 11px; letter-spacing: 1px; color: var(--soft); font-weight: 800; margin-top: 2px; }
+    .addr { margin-top: 12px; font-size: 13.5px; color: var(--soft); line-height: 1.4; }
+    .cta { margin: 20px 18px 10px; padding: 16px; background: var(--scarlet); color: #fff; border: none; border-radius: 14px; font-size: 17px; font-weight: 800; text-align: center; text-decoration: none; display: block; }
+    .note { text-align: center; color: var(--soft); font-size: 12px; padding: 2px 22px 24px; line-height: 1.5; }
     .loading, .error { padding: 60px 30px; text-align: center; color: var(--soft); }
     .error strong { color: var(--ink); display: block; margin-bottom: 6px; font-size: 17px; }
   </style>
@@ -65,30 +72,53 @@
         '<div class="error"><strong>' + esc(msg) + '</strong>This link may have been turned off, or it isn\'t valid.</div>';
     }
 
+    // Join a list of names the way a person would say it.
+    function joinNames(names) {
+      if (names.length <= 1) return names[0] || 'They';
+      if (names.length === 2) return names[0] + ' and ' + names[1];
+      return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    }
+
     function render(w) {
       var path = w.shared_path || [];
       var km = (w.distance_m / 1000).toFixed(2);
-      // Shared walks are titled by the ACCOUNT (household) name, e.g. "Rothko & Ultra's Walk" - the
-      // external viewer doesn't need to know which individual dog. Falls back to the dog name (and the
-      // old dog_name field, so this works before/after the get_shared_walk update).
-      var who = w.walker_name || w.dog_name;
-      var name = who ? (esc(who) + '’s Walk') : 'A Walk';
+      // The dogs on the walk, each with a profile photo. Falls back to splitting the aggregated name
+      // string if an older backend did not return the dogs array.
+      var dogs = Array.isArray(w.dogs) ? w.dogs : [];
+      if (!dogs.length && w.walker_name) dogs = String(w.walker_name).split(' & ').map(function (n) { return { name: n, img_url: null }; });
+      var names = dogs.map(function (d) { return d.name; }).filter(Boolean);
+      var who = names.length ? joinNames(names) : 'They';
+      var they = names.length > 1 ? 'They' : (names[0] || 'They');
+
+      var chips = dogs.map(function (d) {
+        var face = d.img_url ? '<img class="dface" src="' + esc(d.img_url) + '" alt="">' : '<span class="dface"></span>';
+        return '<div class="dog">' + face + '<span class="dname">' + esc(d.name) + '</span></div>';
+      }).join('');
+
       document.getElementById('content').innerHTML =
-        '<div id="map"></div>' +
-        '<div class="title">' + name + '</div>' +
-        '<div class="when">' + esc(fmtWhen(w.started_at)) + '</div>' +
-        '<div class="stats">' +
-          '<div class="stat"><div class="n">' + km + '</div><div class="l">KM</div></div>' +
-          '<div class="divider"></div>' +
-          '<div class="stat"><div class="n">' + fmtDuration(w.duration_s) + '</div><div class="l">TIME</div></div>' +
+        '<div class="intro">' +
+          (chips ? '<div class="dogs">' + chips + '</div>' : '') +
+          '<p class="msg">' + esc(who) + ' enjoyed this walk. ' + esc(they) + ' thought you might like it too.</p>' +
         '</div>' +
-        '<a class="cta" href="https://apps.apple.com/app/jackl">To Walk This Route, Get Jackl</a>' +
-        '<div class="note">The start and end are trimmed for the walker’s privacy.</div>';
+        '<div id="map"></div>' +
+        '<div class="below">' +
+          '<div class="place" id="place">' + esc(w.area || '') + '</div>' +
+          '<div class="stats-row">' +
+            '<div class="stat2"><div class="n">' + km + ' km</div><div class="l">DISTANCE</div></div>' +
+            '<div class="stat2"><div class="n">' + fmtDuration(w.duration_s) + '</div><div class="l">TIME</div></div>' +
+          '</div>' +
+          '<div class="addr" id="addr"></div>' +
+        '</div>' +
+        '<a class="cta" href="https://apps.apple.com/app/jackl">Join Your Pals On Jackl</a>' +
+        (w.trimmed === false ? '' : '<div class="note">The start and end are trimmed for the walker’s privacy.</div>');
 
       var pts = path.map(function (p) { return [p.lat, p.lng]; });
       var map = L.map('map', { zoomControl: false, attributionControl: true });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19, attribution: '© OpenStreetMap'
+      // A clean, labelled basemap (Esri World Topo: green parks, blue water, light roads) so the
+      // shared route reads like the Apple map inside the app rather than the busy default OSM style.
+      // Keyless, unlike CARTO's raster tiles which now require an API key.
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19, attribution: 'Tiles © Esri'
       }).addTo(map);
       if (pts.length >= 2) {
         var line = L.polyline(pts, { color: '#FF3E00', weight: 5 }).addTo(map);
@@ -100,6 +130,37 @@
       } else {
         map.setView([-33.9, 151.18], 13);
       }
+      // Name the PLACE from the middle of the route (most likely inside the park/beach) and the
+      // start ADDRESS from the first point (a street near where you would park). Reverse-geocoded
+      // with OSM Nominatim (keyless); if it fails we keep the walk's own saved place name.
+      if (pts.length) fillPlace(pts, w.area);
+    }
+
+    function geo(lat, lon) {
+      return fetch('https://nominatim.openstreetmap.org/reverse?format=json&zoom=16&addressdetails=1&lat=' + lat + '&lon=' + lon)
+        .then(function (r) { return r.json(); });
+    }
+
+    function fillPlace(pts, areaFallback) {
+      var mid = pts[Math.floor(pts.length / 2)];
+      var start = pts[0];
+      geo(mid[0], mid[1]).then(function (g) {
+        var a = g.address || {};
+        var place = areaFallback || a.leisure || a.park || a.nature_reserve || a.beach || a.suburb || a.neighbourhood || g.name || '';
+        var pEl = document.getElementById('place');
+        if (pEl && place) pEl.textContent = place;
+      }).catch(function () {});
+      // A moment later (Nominatim asks for ~1 request/second), the start address.
+      setTimeout(function () {
+        geo(start[0], start[1]).then(function (g) {
+          var a = g.address || {};
+          var road = a.road || a.pedestrian || a.footway || a.path || '';
+          var locality = a.suburb || a.town || a.city || a.village || a.municipality || '';
+          var addr = [road, locality].filter(Boolean).join(', ');
+          var aEl = document.getElementById('addr');
+          if (aEl && addr) aEl.textContent = 'Near ' + addr;
+        }).catch(function () {});
+      }, 1200);
     }
 
     (function () {
